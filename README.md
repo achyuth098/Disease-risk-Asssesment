@@ -1,2 +1,2 @@
-# MRP-2025
+# Health risk analytics platform
 A web application for disease risk assessment 
