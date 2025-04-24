@@ -1,0 +1,76 @@
+# Virtual environment
+venv/
+.venv/
+
+# Compiled Python files
+*.pyc
+__pycache__/
+
+# Synthea data files
+Backend/Data/
+
+# Model files
+*.pkl
+
+# Logs and temporary files
+*.log
+.cache/
+*.tmp
+
+# Environment configurations
+.env
+*.local
+
+# IDE-specific
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Jupyter notebooks
+*.ipynb
+
+# Backup files
+*.bak
+*.backup
+
+
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+
+# Logs and temporary files
+*.log
+.cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment files
+.env
+.env.*
+
+# IDE-specific
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Editor-specific
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
