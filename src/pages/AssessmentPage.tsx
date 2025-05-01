@@ -1,4 +1,3 @@
-// src/pages/AssessmentPage.tsx
 import React, { useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
@@ -63,27 +62,22 @@ const AssessmentPage = () => {
   const [pincode, setPincode] = useState('');
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [showHospitals, setShowHospitals] = useState(false);
+  const [recommendations, setRecommendations] = useState<string[]>([]);
 
-  // If we don't have state, use the URL parameter
   const disease = state?.disease || diseaseId || '';
   const fileName = state?.fileName || '';
-
-  // Get disease info
   const diseaseInfo = getDiseaseInfo(disease);
 
-  // Icons mapping
   const diseaseIconMap: Record<string, JSX.Element> = {
     diabetes: <Droplet className="h-10 w-10 text-red-500" />,
     kidneyDisease: <Activity className="h-10 w-10 text-purple-500" />,
     heartDisease: <Heart className="h-10 w-10 text-pink-500" />,
   };
 
-  // Questions for each disease
   const diabetesQuestions: Question[] = [
     { id: 'age', question: 'What is your age?', type: 'input' },
     { id: 'hba1c', question: 'What is your Hemoglobin A1c (%)?', type: 'input' },
     { id: 'glucose', question: 'What is your fasting glucose level (mg/dL)?', type: 'input' },
-    { id: 'bmi', question: 'What is your Body Mass Index (BMI)?', type: 'input' },
     { id: 'weight', question: 'What is your body weight (kg)?', type: 'input' },
     { id: 'height', question: 'What is your height (cm)?', type: 'input' },
     { id: 'systolic_bp', question: 'What is your systolic blood pressure (mm Hg)?', type: 'input' },
@@ -105,23 +99,47 @@ const AssessmentPage = () => {
     { id: 'encounter_count', question: 'How many medical encounters (e.g., hospital visits) have you had?', type: 'input' },
   ];
 
-  // Select questions based on disease
   const questions = disease === 'kidneyDisease' ? kidneyQuestions : diabetesQuestions;
-
   const currentQuestion = questions[currentQuestionIndex];
 
-  const handleAnswer = (questionId: string, value: string) => {
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: value
-    }));
+  const calculateBMI = (weight: number, height: number): number => {
+    const heightMeters = height / 100;
+    return weight / (heightMeters * heightMeters);
+  };
 
-    // Auto-advance to next question after a delay
-    setTimeout(() => {
+  const validatePayload = (payload: DiabetesPayload | CKDPayload): boolean => {
+    return Object.entries(payload).every(([key, value]) => {
+      if (value <= 0) {
+        toast.error(`Please provide a valid positive value for ${key}`);
+        return false;
+      }
+      return true;
+    });
+  };
+
+  const parseRecommendations = (text: string): string[] => {
+    const lines = text.split('\n').filter(line => line.trim());
+    const items = [];
+    let currentItem = '';
+    for (const line of lines) {
+      if (/^\d+\./.test(line)) {
+        if (currentItem) items.push(currentItem.trim());
+        currentItem = line;
+      } else {
+        currentItem += ' ' + line;
+      }
+    }
+    if (currentItem) items.push(currentItem.trim());
+    return items.filter(item => !item.toLowerCase().includes('consult a healthcare professional')).slice(0, 7);
+  };
+
+  const handleAnswer = async (questionId: string, value: string) => {
+    setAnswers(prev => ({ ...prev, [questionId]: value }));
+
+    setTimeout(async () => {
       if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
       } else {
-        // Prepare payload based on disease
         let payload: DiabetesPayload | CKDPayload;
         if (disease === 'kidneyDisease') {
           payload = {
@@ -136,12 +154,15 @@ const AssessmentPage = () => {
             encounter_count: parseFloat(answers.encounter_count) || 0
           };
         } else {
+          const weight = parseFloat(answers.weight) || 0;
+          const height = parseFloat(answers.height) || 0;
+          const bmi = height > 0 ? calculateBMI(weight, height) : 0;
           payload = {
             hba1c: parseFloat(answers.hba1c) || 0,
             glucose: parseFloat(answers.glucose) || 0,
-            bmi: parseFloat(answers.bmi) || 0,
-            weight: parseFloat(answers.weight) || 0,
-            height: parseFloat(answers.height) || 0,
+            bmi,
+            weight,
+            height,
             systolic_bp: parseFloat(answers.systolic_bp) || 0,
             diastolic_bp: parseFloat(answers.diastolic_bp) || 0,
             cholesterol: parseFloat(answers.cholesterol) || 0,
@@ -151,50 +172,59 @@ const AssessmentPage = () => {
           };
         }
 
-        // Check for invalid inputs (only NaN or undefined)
         if (Object.values(payload).some(val => isNaN(val))) {
           toast.error("Please provide valid numeric values for all fields.");
           return;
         }
 
-        console.log("Sending data:", payload);
+        if (!validatePayload(payload)) {
+          return;
+        }
 
-        // Determine endpoint
+        console.log("Sending data:", JSON.stringify(payload));
         const endpoint = disease === 'kidneyDisease' ? '/predict_kidney' : '/predict_diabetes';
 
-        // Make API call
-        fetch(`http://localhost:8000${endpoint}`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(payload)
-        })
-          .then(res => {
-            if (!res.ok) {
-              throw new Error(`HTTP error! Status: ${res.status}`);
-            }
-            return res.json();
-          })
-          .then(data => {
-            console.log("API response:", data);
-            setRiskScore(Math.round(data.risk_percentage));
-            setIsCompleted(true);
-            toast.success("Assessment completed!");
-          })
-          .catch((err) => {
-            console.error("API error:", err);
-            toast.error("Failed to calculate risk. Please try again.");
-            setRiskScore(0);
+        try {
+          const predictResponse = await fetch(`http://localhost:8000${endpoint}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
           });
+
+          if (!predictResponse.ok) {
+            const errorText = await predictResponse.text();
+            throw new Error(`Prediction failed: ${predictResponse.status} - ${errorText}`);
+          }
+
+          const predictData = await predictResponse.json();
+          console.log("Prediction response:", JSON.stringify(predictData));
+          setRiskScore(Math.round(predictData.risk_percentage));
+
+          const recommendationPayload = { disease, risk_score: predictData.risk_percentage, ...payload };
+          const recommendationResponse = await fetch("http://localhost:8000/recommendations", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(recommendationPayload)
+          });
+
+          if (!recommendationResponse.ok) {
+            const errorText = await recommendationResponse.text();
+            throw new Error(`Recommendations failed: ${recommendationResponse.status} - ${errorText}`);
+          }
+
+          const recData = await recommendationResponse.json();
+          console.log("Raw recommendations:", recData.recommendations);
+          const parsedRecommendations = parseRecommendations(recData.recommendations[0] || '');
+          setRecommendations(parsedRecommendations.length > 0 ? parsedRecommendations : ['No specific recommendations available.']);
+          setIsCompleted(true);
+          toast.success("Assessment completed!");
+        } catch (err: any) {
+          console.error("API error:", err.message);
+          toast.error(`Error: ${err.message}`);
+          setRiskScore(0);
+        }
       }
     }, 500);
-  };
-
-  const getRiskLevel = (score: number) => {
-    if (score < 33) return { level: 'low', color: 'text-green-500', message: 'Low Risk' };
-    if (score < 66) return { level: 'moderate', color: 'text-yellow-500', message: 'Moderate Risk' };
-    return { level: 'high', color: 'text-red-500', message: 'High Risk' };
   };
 
   const handleFindHospitals = () => {
@@ -204,32 +234,20 @@ const AssessmentPage = () => {
     }
 
     const mockHospitals: Hospital[] = [
-      {
-        id: '1',
-        name: 'City General Hospital',
-        address: `123 Health Ave, ${pincode}`,
-        distance: '1.2 km',
-        specialties: ['Cardiology', 'Endocrinology', 'General Medicine']
-      },
-      {
-        id: '2',
-        name: 'Community Medical Center',
-        address: `456 Wellness Blvd, ${pincode}`,
-        distance: '2.5 km',
-        specialties: ['Nephrology', 'Diabetes Care', 'Internal Medicine']
-      },
-      {
-        id: '3',
-        name: 'Excellence Healthcare',
-        address: `789 Care Street, ${pincode}`,
-        distance: '3.8 km',
-        specialties: ['Cardiology', 'Nephrology', 'Preventive Care']
-      }
+      { id: '1', name: 'City General Hospital', address: `123 Health Ave, ${pincode}`, distance: '1.2 km', specialties: ['Cardiology', 'Endocrinology', 'General Medicine'] },
+      { id: '2', name: 'Community Medical Center', address: `456 Wellness Blvd, ${pincode}`, distance: '2.5 km', specialties: ['Nephrology', 'Diabetes Care', 'Internal Medicine'] },
+      { id: '3', name: 'Excellence Healthcare', address: `789 Care Street, ${pincode}`, distance: '3.8 km', specialties: ['Cardiology', 'Nephrology', 'Preventive Care'] }
     ];
 
     setHospitals(mockHospitals);
     setShowHospitals(true);
     toast.success("Found nearby healthcare facilities");
+  };
+
+  const getRiskLevel = (score: number) => {
+    if (score < 33) return { level: 'low', color: 'text-green-500', message: 'Low Risk' };
+    if (score < 66) return { level: 'moderate', color: 'text-yellow-500', message: 'Moderate Risk' };
+    return { level: 'high', color: 'text-red-500', message: 'High Risk' };
   };
 
   const riskInfo = getRiskLevel(riskScore);
@@ -238,12 +256,10 @@ const AssessmentPage = () => {
     <div className="container mx-auto px-4 py-8 max-w-5xl">
       <div className="mb-8 text-center">
         <div className="flex items-center justify-center gap-3 mb-2">
-          {diseaseIconMap[disease] || 
-            <AlertCircle className="h-10 w-10 text-gray-500" />}
+          {diseaseIconMap[disease] || <AlertCircle className="h-10 w-10 text-gray-500" />}
           <h1 className="text-3xl font-bold">{diseaseInfo.title} Assessment</h1>
         </div>
         <p className="text-gray-600 max-w-2xl mx-auto">{diseaseInfo.description}</p>
-        
         {fileName && (
           <div className="flex items-center justify-center mt-4 text-sm text-gray-600">
             <FileText className="h-4 w-4 mr-1" />
@@ -271,6 +287,7 @@ const AssessmentPage = () => {
               <Input
                 type="number"
                 step="any"
+                min="0"
                 placeholder="Enter a value"
                 value={answers[currentQuestion.id] || ''}
                 onChange={(e) => setAnswers(prev => ({ ...prev, [currentQuestion.id]: e.target.value }))}
@@ -292,8 +309,8 @@ const AssessmentPage = () => {
               
               <Button 
                 onClick={() => {
-                  if (!answers[currentQuestion.id]) {
-                    toast.error("Please answer the current question");
+                  if (!answers[currentQuestion.id] || parseFloat(answers[currentQuestion.id]) <= 0) {
+                    toast.error("Please enter a valid positive number");
                     return;
                   }
                   if (currentQuestionIndex < questions.length - 1) {
@@ -323,13 +340,10 @@ const AssessmentPage = () => {
                 <div className="absolute inset-0 rounded-full border-8 border-gray-100"></div>
                 <div 
                   className="absolute inset-0 rounded-full border-8 border-transparent border-t-blue-500"
-                  style={{ 
-                    transform: `rotate(${riskScore * 3.6}deg)`,
-                    transition: 'transform 1s ease-out'
-                  }}
+                  style={{ transform: `rotate(${riskScore * 3.6}deg)`, transition: 'transform 1s ease-out' }}
                 ></div>
                 <div className="absolute inset-0 flex items-center justify-center flex-col">
-                  <span className="text-4xl font-bold">{riskScore}%</span>
+                  <span className="text-4xl font-bold">{Math.floor(riskScore)}%</span>
                   <span className={`text-sm font-medium ${riskInfo.color}`}>{riskInfo.message}</span>
                 </div>
               </div>
@@ -343,7 +357,24 @@ const AssessmentPage = () => {
                 {riskInfo.level === 'high' && 'You have significant risk factors. We recommend consulting with a healthcare professional.'}
               </p>
               
-              <h3 className="font-semibold mb-3">Next steps:</h3>
+              <h3 className="font-semibold mb-3">Health Recommendations:</h3>
+              <ul className="text-gray-700 space-y-2 mb-4">
+                {recommendations.length > 0 ? (
+                  recommendations.map((rec, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                      <span>{rec}</span>
+                    </li>
+                  ))
+                ) : (
+                  <li className="text-gray-500">No recommendations available.</li>
+                )}
+              </ul>
+              <p className="text-gray-600 text-sm italic">
+                Disclaimer: These recommendations are general and educational. Always consult a healthcare professional for personalized advice.
+              </p>
+              
+              <h3 className="font-semibold mb-3 mt-6">Next steps:</h3>
               <ul className="text-gray-700 space-y-2">
                 <li className="flex items-start gap-2">
                   <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />

@@ -3,6 +3,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import joblib
 import numpy as np
+import requests
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file in project root
+env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env')
+if not os.path.exists(env_path):
+    raise RuntimeError(f".env file not found at {env_path}")
+load_dotenv(env_path)
 
 app = FastAPI()
 
@@ -20,7 +29,7 @@ try:
     diabetes_model = joblib.load("models/diabetes_model.pkl")
     kidney_model = joblib.load("models/kidney_model.pkl")
 except Exception as e:
-    raise Exception(f"Failed to load models: {str(e)}")
+    raise RuntimeError(f"Failed to load models: {str(e)}")
 
 # Define input features for diabetes
 class HealthInput(BaseModel):
@@ -48,6 +57,20 @@ class CKDInput(BaseModel):
     diastolic_bp: float
     encounter_count: float
 
+# Define input for recommendations
+class RecommendationInput(BaseModel):
+    disease: str
+    risk_score: float
+    age: float
+    hba1c: float
+    glucose: float
+    bmi: float
+    systolic_bp: float
+    diastolic_bp: float
+    egfr: float
+    albumin_creatinine: float = None
+    encounter_count: float = None
+
 @app.post("/predict_diabetes")
 def predict_diabetes_risk(data: HealthInput):
     try:
@@ -59,7 +82,7 @@ def predict_diabetes_risk(data: HealthInput):
         risk = diabetes_model.predict_proba(features)[0][1]
         return {"risk_percentage": round(risk * 100, 2)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
 @app.post("/predict_kidney")
 def predict_kidney_risk(data: CKDInput):
@@ -71,4 +94,97 @@ def predict_kidney_risk(data: CKDInput):
         risk = kidney_model.predict_proba(features)[0][1]
         return {"risk_percentage": round(risk * 100, 2)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+
+def check_vital_ranges(data: RecommendationInput):
+    vital_status = []
+    age = data.age
+    if data.hba1c >= 6.5:
+        vital_status.append("HbA1c is high (diabetes range, normal <5.7%)")
+    elif data.hba1c >= 5.7:
+        vital_status.append("HbA1c is elevated (prediabetes range, normal <5.7%)")
+    else:
+        vital_status.append("HbA1c is within normal range (<5.7%)")
+    if data.glucose >= 126:
+        vital_status.append("Fasting glucose is high (diabetes range, normal 70–99 mg/dL)")
+    elif data.glucose >= 100:
+        vital_status.append("Fasting glucose is elevated (prediabetes range, normal 70–99 mg/dL)")
+    else:
+        vital_status.append("Fasting glucose is within normal range (70–99 mg/dL)")
+    if data.bmi >= 30:
+        vital_status.append("BMI indicates obesity (normal 18.5–24.9)")
+    elif data.bmi >= 25:
+        vital_status.append("BMI indicates overweight (normal 18.5–24.9)")
+    else:
+        vital_status.append("BMI is within normal range (18.5–24.9)")
+    if data.systolic_bp >= 130 or data.diastolic_bp >= 80:
+        vital_status.append("Blood pressure is high (hypertension, normal <120/<80 mm Hg)")
+    elif data.systolic_bp >= 120:
+        vital_status.append("Blood pressure is elevated (normal <120/<80 mm Hg)")
+    else:
+        vital_status.append("Blood pressure is within normal range (<120/<80 mm Hg)")
+    if age < 40 and data.egfr < 90:
+        vital_status.append("eGFR is below normal for your age group (<40 years, normal ≥90 mL/min/1.73m²)")
+    elif age < 60 and data.egfr < 80:
+        vital_status.append("eGFR is below normal for your age group (40–59 years, normal ≥80 mL/min/1.73m²)")
+    elif age >= 60 and data.egfr < 70:
+        vital_status.append("eGFR is below normal for your age group (60+ years, normal ≥70 mL/min/1.73m²)")
+    else:
+        vital_status.append("eGFR is within normal range for your age group")
+    if data.disease == "kidneyDisease":
+        if data.albumin_creatinine and data.albumin_creatinine > 300:
+            vital_status.append("Albumin-creatinine ratio indicates macroalbuminuria (normal <30 mg/g)")
+        elif data.albumin_creatinine and data.albumin_creatinine >= 30:
+            vital_status.append("Albumin-creatinine ratio indicates microalbuminuria (normal <30 mg/g)")
+        else:
+            vital_status.append("Albumin-creatinine ratio is within normal range (<30 mg/g)")
+        if data.encounter_count and data.encounter_count > 5:
+            vital_status.append("High number of medical encounters (>5)")
+        else:
+            vital_status.append("Number of medical encounters is typical (≤5)")
+    return vital_status
+
+@app.post("/recommendations")
+def get_recommendations(data: RecommendationInput):
+    try:
+        # Check vital ranges
+        vital_status = check_vital_ranges(data)
+        
+        # Construct prompt for Mixtral-8x7B-Instruct
+        prompt = (
+            f"[INST] As a non-medical assistant, provide general, educational lifestyle tips for managing {data.disease} "
+            f"with a risk score of {data.risk_score}% for a {int(data.age)}-year-old. "
+            f"Current health status: {', '.join(vital_status)}. "
+            f"Do not provide medical advice, diagnoses, or treatments. "
+            f"Focus on diet, exercise, stress management, and general wellness. "
+            f"Provide up to 7 numbered tips (e.g., 1. Diet: ...). "
+            f"End with: 'Consult a healthcare professional for personalized advice.' [/INST]"
+        )
+        
+        # Call Hugging Face Inference API
+        api_key = os.getenv("HUGGINGFACE_API_KEY")
+        if not api_key:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Hugging Face API key not configured. Ensure HUGGINGFACE_API_KEY is set in {env_path}"
+            )
+        
+        response = requests.post(
+            "https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "inputs": prompt,
+                "parameters": {"max_new_tokens": 300, "return_full_text": False}
+            }
+        )
+        
+        if not response.ok:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Hugging Face API error: {response.status_code} - {response.text}"
+            )
+        
+        recommendations = response.json()[0].get("generated_text", "No recommendations available")
+        return {"recommendations": [recommendations]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Recommendation error: {str(e)}")
