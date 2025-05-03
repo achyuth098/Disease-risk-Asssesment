@@ -1,7 +1,3 @@
-<<<<<<< HEAD
-
-=======
->>>>>>> teammate-repo/main
 export type User = {
   id: string;
   name: string;
@@ -20,16 +16,11 @@ export type AssessmentType = {
   answers: Record<string, any>;
   riskScore?: number;
   riskLevel?: 'low' | 'moderate' | 'high';
-<<<<<<< HEAD
-  region?: string; // Added region/pincode for geographic analysis
-=======
-  region: string; // Changed from optional to required
-  // New demographic fields
-  age?: number;
-  gender?: 'male' | 'female' | 'other';
-  zipCode?: string;
-  urbanRural?: 'urban' | 'suburban' | 'rural';
->>>>>>> teammate-repo/main
+  region: string;
+  age: number;
+  gender: 'male' | 'female' | 'other';
+  zipCode: string;
+  urbanRural: 'urban' | 'suburban' | 'rural';
 }
 
 export type Question = {
@@ -48,8 +39,6 @@ export type Question = {
   };
 }
 
-<<<<<<< HEAD
-=======
 export type InputType = {
   type: 'number' | 'text' | 'select';
   min?: number;
@@ -67,7 +56,6 @@ export type Feature = {
   input: InputType;
 }
 
->>>>>>> teammate-repo/main
 export type QuestionsByDisease = Record<Disease, Question[]>;
 
 export type Report = {
@@ -90,8 +78,6 @@ export type AnalyticsSummary = {
   assessmentsByRegion: Record<string, number>;
   topRiskFactors: Array<{factor: string, count: number}>;
 }
-<<<<<<< HEAD
-=======
 
 export type SyntheaFeature = {
   id: string;
@@ -138,4 +124,3 @@ export type AIInsight = {
   content: string | number;
   context?: string;
 }
->>>>>>> teammate-repo/main

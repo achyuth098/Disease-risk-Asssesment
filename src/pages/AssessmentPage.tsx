@@ -57,6 +57,136 @@ interface CKDPayload {
   encounter_count: number;
 }
 
+interface DemographicsFormProps {
+  age: string;
+  setAge: React.Dispatch<React.SetStateAction<string>>;
+  gender: string;
+  setGender: React.Dispatch<React.SetStateAction<string>>;
+  zipCode: string;
+  setZipCode: React.Dispatch<React.SetStateAction<string>>;
+  urbanRural: string;
+  setUrbanRural: React.Dispatch<React.SetStateAction<string>>;
+  setAnswers: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  setCurrentStep: React.Dispatch<React.SetStateAction<number>>;
+}
+
+const DemographicsForm: React.FC<DemographicsFormProps> = ({
+  age,
+  setAge,
+  gender,
+  setGender,
+  zipCode,
+  setZipCode,
+  urbanRural,
+  setUrbanRural,
+  setAnswers,
+  setCurrentStep,
+}) => {
+  const ageInputRef = useRef<HTMLInputElement>(null);
+
+  const handleDemographicsComplete = () => {
+    if (!age || isNaN(Number(age)) || Number(age) < 18 || Number(age) > 100) {
+      toast.error("Please enter a valid age between 18 and 100");
+      return;
+    }
+    if (!gender) {
+      toast.error("Please select your gender");
+      return;
+    }
+    if (!zipCode || zipCode.length < 5 || zipCode.length > 10) {
+      toast.error("Please enter a valid zipcode/postal code");
+      return;
+    }
+    if (!urbanRural) {
+      toast.error("Please select your area type");
+      return;
+    }
+    setAnswers(prev => ({
+      ...prev,
+      age,
+      gender,
+      zipCode,
+      urbanRural
+    }));
+    setCurrentStep(1);
+  };
+
+  return (
+    <BlurCard className="max-w-3xl mx-auto">
+      <h2 className="text-xl font-semibold mb-6">Demographic Information</h2>
+      <p className="text-gray-600 mb-6">Please provide some basic information to help us with your assessment.</p>
+      <div className="space-y-6">
+        <div>
+          <Label htmlFor="age">Age (18-100)</Label>
+          <Input
+            id="age"
+            type="number"
+            value={age}
+            onChange={(e) => setAge(e.target.value)}
+            placeholder="Enter your age"
+            min={18}
+            max={100}
+            className="mt-1"
+            ref={ageInputRef}
+          />
+        </div>
+        <div>
+          <Label htmlFor="gender">Gender</Label>
+          <RadioGroup
+            value={gender}
+            onValueChange={setGender}
+            className="mt-2 flex flex-col space-y-1"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="male" id="gender-male" />
+              <Label htmlFor="gender-male">Male</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="female" id="gender-female" />
+              <Label htmlFor="gender-female">Female</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="other" id="gender-other" />
+              <Label htmlFor="gender-other">Other</Label>
+            </div>
+          </RadioGroup>
+        </div>
+        <div>
+          <Label htmlFor="zipcode">Zipcode/Postal Code</Label>
+          <Input
+            id="zipcode"
+            type="text"
+            value={zipCode}
+            onChange={(e) => setZipCode(e.target.value)}
+            placeholder="Enter your zipcode/postal code"
+            className="mt-1"
+            maxLength={10}
+          />
+        </div>
+        <div>
+          <Label htmlFor="area-type">Area Type</Label>
+          <Select value={urbanRural} onValueChange={setUrbanRural}>
+            <SelectTrigger className="mt-1">
+              <SelectValue placeholder="Select your area type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="urban">Urban</SelectItem>
+              <SelectItem value="suburban">Suburban</SelectItem>
+              <SelectItem value="rural">Rural</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="pt-4">
+          <Button onClick={handleDemographicsComplete} className="w-full">
+            Continue to Health Assessment
+            <ChevronRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </BlurCard>
+  );
+};
+
 const AssessmentPage = () => {
   const { diseaseId } = useParams();
   const location = useLocation();
@@ -114,7 +244,7 @@ const AssessmentPage = () => {
     { id: 'encounter_count', question: 'How many medical encounters (e.g., hospital visits) have you had?', type: 'input', min: 0, max: 100 },
   ];
 
-  const questions = disease === 'kidneyDisease' ? kidneyQuestions : diabetesВопросы;
+  const questions = disease === 'kidneyDisease' ? kidneyQuestions : diabetesQuestions;
   const currentQuestion = currentStep === 1 ? questions[currentQuestionIndex] : null;
 
   const calculateBMI = (weight: number, height: number): number => {
@@ -125,7 +255,7 @@ const AssessmentPage = () => {
   const validatePayload = (payload: DiabetesPayload | CKDPayload): boolean => {
     return Object.entries(payload).every(([key, value]) => {
       if (value <= 0 && key !== 'encounter_count') {
-        toast.error(`Please provide a valid positive value for ${key}`);
+        toast.error(`Please provide a valid positive value for ${key.replace('_', ' ')}`);
         return false;
       }
       return true;
@@ -148,109 +278,6 @@ const AssessmentPage = () => {
     return items.filter(item => !item.toLowerCase().includes('consult a healthcare professional')).slice(0, 7);
   };
 
-  const DemographicsForm = () => {
-    const handleDemographicsComplete = () => {
-      if (!age || isNaN(Number(age)) || Number(age) < 18 || Number(age) > 100) {
-        toast.error("Please enter a valid age between 18 and 100");
-        return;
-      }
-      if (!gender) {
-        toast.error("Please select your gender");
-        return;
-      }
-      if (!zipCode || zipCode.length < 5 || zipCode.length > 10) {
-        toast.error("Please enter a valid zipcode/postal code");
-        return;
-      }
-      if (!urbanRural) {
-        toast.error("Please select your area type");
-        return;
-      }
-      setAnswers(prev => ({
-        ...prev,
-        age,
-        gender,
-        zipCode,
-        urbanRural
-      }));
-      setCurrentStep(1);
-    };
-
-    return (
-      <BlurCard className="max-w-3xl mx-auto">
-        <h2 className="text-xl font-semibold mb-6">Demographic Information</h2>
-        <p className="text-gray-600 mb-6">Please provide some basic information to help us with your assessment.</p>
-        <div className="space-y-6">
-          <div>
-            <Label htmlFor="age">Age (18-100)</Label>
-            <Input
-              id="age"
-              type="number"
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
-              placeholder="Enter your age"
-              min={18}
-              max={100}
-              className="mt-1"
-            />
-          </div>
-          <div>
-            <Label htmlFor="gender">Gender</Label>
-            <RadioGroup
-              value={gender}
-              onValueChange={setGender}
-              className="mt-2 flex flex-col space-y-1"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="male" id="gender-male" />
-                <Label htmlFor="gender-male">Male</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="female" id="gender-female" />
-                <Label htmlFor="gender-female">Female</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="other" id="gender-other" />
-                <Label htmlFor="gender-other">Other</Label>
-              </div>
-            </RadioGroup>
-          </div>
-          <div>
-            <Label htmlFor="zipcode">Zipcode/Postal Code</Label>
-            <Input
-              id="zipcode"
-              type="text"
-              value={zipCode}
-              onChange={(e) => setZipCode(e.target.value)}
-              placeholder="Enter your zipcode/postal code"
-              className="mt-1"
-              maxLength={10}
-            />
-          </div>
-          <div>
-            <Label htmlFor="area-type">Area Type</Label>
-            <Select value={urbanRural} onValueChange={setUrbanRural}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select your area type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="urban">Urban</SelectItem>
-                <SelectItem value="suburban">Suburban</SelectItem>
-                <SelectItem value="rural">Rural</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="pt-4">
-            <Button onClick={handleDemographicsComplete} className="w-full">
-              Continue to Health Assessment
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </BlurCard>
-    );
-  };
-
   useEffect(() => {
     if (currentStep === 1 && currentQuestion && inputRef.current) {
       inputRef.current.focus();
@@ -261,7 +288,7 @@ const AssessmentPage = () => {
     if (currentQuestion) {
       const numValue = parseFloat(value);
       if (isNaN(numValue) || numValue < (currentQuestion.min || 0) || numValue > (currentQuestion.max || Infinity)) {
-        toast.error(`Please enter a valid number between ${currentQuestion.min || 0} and ${currentQuestion.max || 'any value'}`);
+        toast.error(`Please enter a valid number between ${currentQuestion.min || 0} and ${currentQuestion.max || 'any value'} for ${currentQuestion.question}`);
         return;
       }
       setAnswers(prev => ({ ...prev, [questionId]: value }));
@@ -308,12 +335,19 @@ const AssessmentPage = () => {
           endpoint = '/predict_diabetes';
         }
 
-        if (Object.values(payload).some(val => isNaN(val))) {
-          toast.error("Please provide valid numeric values for all fields.");
-          return;
+        // Enhanced validation to ensure no zero values for critical fields
+        const requiredFields = disease === 'kidneyDisease'
+          ? ['age', 'egfr', 'albumin_creatinine', 'glucose', 'hba1c', 'bmi', 'systolic_bp', 'diastolic_bp']
+          : ['hba1c', 'glucose', 'weight', 'height', 'systolic_bp', 'diastolic_bp', 'cholesterol', 'ldl', 'egfr', 'age'];
+        for (const field of requiredFields) {
+          if ((payload as any)[field] <= 0) {
+            toast.error(`Please provide a valid positive value for ${field.replace('_', ' ')}`);
+            return;
+          }
         }
 
-        if (!validatePayload(payload)) {
+        if (Object.values(payload).some(val => isNaN(val))) {
+          toast.error("Please provide valid numeric values for all fields.");
           return;
         }
 
@@ -365,7 +399,7 @@ const AssessmentPage = () => {
                 riskScore: riskScore,
                 riskLevel: riskLevel,
                 region: region,
-                age: Number(age),
+                age: parseFloat(age) || 0,
                 gender: gender as 'male' | 'female' | 'other',
                 zipCode,
                 urbanRural: urbanRural as 'urban' | 'suburban' | 'rural'
@@ -481,7 +515,22 @@ const AssessmentPage = () => {
       </div>
       {!isCompleted ? (
         <>
-          {currentStep === 0 ? <DemographicsForm /> : renderHealthMetrics()}
+          {currentStep === 0 ? (
+            <DemographicsForm
+              age={age}
+              setAge={setAge}
+              gender={gender}
+              setGender={setGender}
+              zipCode={zipCode}
+              setZipCode={setZipCode}
+              urbanRural={urbanRural}
+              setUrbanRural={setUrbanRural}
+              setAnswers={setAnswers}
+              setCurrentStep={setCurrentStep}
+            />
+          ) : (
+            renderHealthMetrics()
+          )}
         </>
       ) : (
         <div className="max-w-3xl mx-auto">
