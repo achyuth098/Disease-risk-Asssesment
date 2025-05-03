@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Optional
 import joblib
 import numpy as np
 import requests
@@ -18,7 +19,7 @@ app = FastAPI()
 # Add CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:8080"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,43 +34,43 @@ except Exception as e:
 
 # Define input features for diabetes
 class HealthInput(BaseModel):
-    hba1c: float
-    glucose: float
-    bmi: float
-    weight: float
-    height: float
-    systolic_bp: float
-    diastolic_bp: float
-    cholesterol: float
-    ldl: float
-    egfr: float
-    age: float
+    hba1c: float = Field(..., gt=0, le=15)
+    glucose: float = Field(..., gt=0, le=300)
+    bmi: float = Field(..., gt=0, le=50)
+    weight: float = Field(..., gt=0, le=200)
+    height: float = Field(..., gt=0, le=250)
+    systolic_bp: float = Field(..., gt=0, le=200)
+    diastolic_bp: float = Field(..., gt=0, le=120)
+    cholesterol: float = Field(..., gt=0, le=400)
+    ldl: float = Field(..., gt=0, le=300)
+    egfr: float = Field(..., gt=0, le=120)
+    age: float = Field(..., gt=0, le=100)
 
 # Define input features for CKD
 class CKDInput(BaseModel):
-    age: float
-    egfr: float
-    albumin_creatinine: float
-    glucose: float
-    hba1c: float
-    bmi: float
-    systolic_bp: float
-    diastolic_bp: float
-    encounter_count: float
+    age: float = Field(..., gt=0, le=100)
+    egfr: float = Field(..., gt=0, le=120)
+    albumin_creatinine: float = Field(..., ge=0, le=3000)
+    glucose: float = Field(..., gt=0, le=300)
+    hba1c: float = Field(..., gt=0, le=15)
+    bmi: float = Field(..., gt=0, le=50)
+    systolic_bp: float = Field(..., gt=0, le=200)
+    diastolic_bp: float = Field(..., gt=0, le=120)
+    encounter_count: float = Field(..., ge=0, le=100)
 
 # Define input for recommendations
 class RecommendationInput(BaseModel):
     disease: str
     risk_score: float
-    age: float
-    hba1c: float
-    glucose: float
-    bmi: float
-    systolic_bp: float
-    diastolic_bp: float
-    egfr: float
-    albumin_creatinine: float = None
-    encounter_count: float = None
+    age: float = Field(..., gt=0, le=100)
+    hba1c: float = Field(..., gt=0, le=15)
+    glucose: float = Field(..., gt=0, le=300)
+    bmi: float = Field(..., gt=0, le=50)
+    systolic_bp: float = Field(..., gt=0, le=200)
+    diastolic_bp: float = Field(..., gt=0, le=120)
+    egfr: float = Field(..., gt=0, le=120)
+    albumin_creatinine: Optional[float] = Field(None, ge=0, le=3000)
+    encounter_count: Optional[float] = Field(None, ge=0, le=100)
 
 @app.post("/predict_diabetes")
 def predict_diabetes_risk(data: HealthInput):
@@ -82,7 +83,7 @@ def predict_diabetes_risk(data: HealthInput):
         risk = diabetes_model.predict_proba(features)[0][1]
         return {"risk_percentage": round(risk * 100, 2)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Prediction error: Invalid input data - {str(e)}")
 
 @app.post("/predict_kidney")
 def predict_kidney_risk(data: CKDInput):
@@ -94,7 +95,7 @@ def predict_kidney_risk(data: CKDInput):
         risk = kidney_model.predict_proba(features)[0][1]
         return {"risk_percentage": round(risk * 100, 2)}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Prediction error: Invalid input data - {str(e)}")
 
 def check_vital_ranges(data: RecommendationInput):
     vital_status = []
@@ -156,8 +157,9 @@ def get_recommendations(data: RecommendationInput):
             f"with a risk score of {data.risk_score}% for a {int(data.age)}-year-old. "
             f"Current health status: {', '.join(vital_status)}. "
             f"Do not provide medical advice, diagnoses, or treatments. "
-            f"Focus on diet, exercise, stress management, and general wellness. "
-            f"Provide up to 7 numbered tips (e.g., 1. Diet: ...). "
+            f"Focus on diet, exercise, weight management, blood pressure control, and stress management. "
+            f"Provide exactly 5 numbered tips (e.g., 1. Diet: ...), each complete, concise, and ending with a period. "
+            f"Ensure a total word count of 120–150 words to avoid truncation. "
             f"End with: 'Consult a healthcare professional for personalized advice.' [/INST]"
         )
         
@@ -174,7 +176,7 @@ def get_recommendations(data: RecommendationInput):
             headers={"Authorization": f"Bearer {api_key}"},
             json={
                 "inputs": prompt,
-                "parameters": {"max_new_tokens": 300, "return_full_text": False}
+                "parameters": {"max_new_tokens": 200, "return_full_text": False}
             }
         )
         
