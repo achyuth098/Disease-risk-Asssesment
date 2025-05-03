@@ -1,8 +1,15 @@
+<<<<<<< HEAD
 
 import { User, AssessmentType, Report, Disease, QuestionsByDisease } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
 // Mock current user
+=======
+import { User, AssessmentType, Report, Disease, QuestionsByDisease } from './types';
+import { v4 as uuidv4 } from 'uuid';
+
+// Mock current user (keeping this for development purposes)
+>>>>>>> teammate-repo/main
 export const currentUser: User = {
   id: '1',
   name: 'John Doe',
@@ -10,7 +17,11 @@ export const currentUser: User = {
   avatar: '/assets/avatar-placeholder.jpg'
 };
 
+<<<<<<< HEAD
 // Mock assessment templates
+=======
+// Assessment question templates
+>>>>>>> teammate-repo/main
 export const questionsByDisease: QuestionsByDisease = {
   diabetes: [
     {
@@ -170,6 +181,7 @@ export const questionsByDisease: QuestionsByDisease = {
   ]
 };
 
+<<<<<<< HEAD
 // Mock assessments
 export const mockAssessments: AssessmentType[] = [
   {
@@ -246,6 +258,15 @@ export const mockReports: Report[] = [
 // Mock risk calculation function
 export const calculateRisk = (disease: Disease, answers: Record<string, any>): { score: number, level: 'low' | 'moderate' | 'high' } => {
   // This is a simplified mock risk calculation
+=======
+// Empty arrays for assessments and reports - no more mock data
+export const mockAssessments: AssessmentType[] = [];
+export const mockReports: Report[] = [];
+
+// Risk calculation function - modified to validate US location
+export const calculateRisk = (disease: Disease, answers: Record<string, any>): { score: number, level: 'low' | 'moderate' | 'high' } => {
+  // This is a simplified risk calculation
+>>>>>>> teammate-repo/main
   // In a real application, this would involve actual medical algorithms
   
   let score = 0;
@@ -426,9 +447,44 @@ export const generateReport = (assessment: AssessmentType): Report => {
   };
 };
 
+<<<<<<< HEAD
 // Function to create a new assessment
 export const createAssessment = (userId: string, type: Disease, answers: Record<string, any>): AssessmentType => {
   const { score, level } = calculateRisk(type, answers);
+=======
+// US State list for validation
+const usStates = [
+  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware', 
+  'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 
+  'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi', 'Missouri', 
+  'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico', 'New York', 'North Carolina', 
+  'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 
+  'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming',
+  'District of Columbia'
+];
+
+// Function to validate US location
+const isValidUsLocation = (city: string, state: string): boolean => {
+  // Check if the state is in the US states list (case-insensitive)
+  return usStates.some(s => s.toLowerCase() === state.toLowerCase());
+};
+
+// Function to create a new assessment - updated to require US location
+export const createAssessment = (
+  userId: string, 
+  type: Disease, 
+  answers: Record<string, any>, 
+  city: string = '',
+  state: string = ''
+): AssessmentType | null => {
+  // Validate US location
+  if (!city || !state || !isValidUsLocation(city, state)) {
+    return null; // Return null if not a valid US location
+  }
+  
+  const { score, level } = calculateRisk(type, answers);
+  const region = `${city}, ${state}`;
+>>>>>>> teammate-repo/main
   
   return {
     id: uuidv4(),
@@ -437,6 +493,11 @@ export const createAssessment = (userId: string, type: Disease, answers: Record<
     date: new Date().toISOString().split('T')[0],
     answers,
     riskScore: score,
+<<<<<<< HEAD
     riskLevel: level
+=======
+    riskLevel: level,
+    region
+>>>>>>> teammate-repo/main
   };
 };

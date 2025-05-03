@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,11 +8,19 @@ import { toast } from "sonner";
 import { getDiseaseInfo } from '@/lib/utils';
 import { BlurCard } from '@/components/ui-custom/BlurCard';
 import { AnimatedGradientText } from '@/components/ui-custom/AnimatedGradientText';
+import { supabase } from '@/integrations/supabase/client';
+import { useStore } from '@/lib/store';
+import { useAuth } from '@/contexts/AuthContext';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Question {
   id: string;
   question: string;
   type: 'input';
+  min?: number;
+  max?: number;
 }
 
 interface Hospital {
@@ -54,7 +62,10 @@ const AssessmentPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const state = location.state as { disease: string; fileName?: string } | null;
+  const { user } = useAuth();
+  const { addAssessment } = useStore();
 
+  const [currentStep, setCurrentStep] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [isCompleted, setIsCompleted] = useState(false);
@@ -63,6 +74,12 @@ const AssessmentPage = () => {
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [showHospitals, setShowHospitals] = useState(false);
   const [recommendations, setRecommendations] = useState<string[]>([]);
+  const [age, setAge] = useState<string>('');
+  const [gender, setGender] = useState<string>('');
+  const [zipCode, setZipCode] = useState<string>('');
+  const [urbanRural, setUrbanRural] = useState<string>('');
+
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const disease = state?.disease || diseaseId || '';
   const fileName = state?.fileName || '';
@@ -75,32 +92,30 @@ const AssessmentPage = () => {
   };
 
   const diabetesQuestions: Question[] = [
-    { id: 'age', question: 'What is your age?', type: 'input' },
-    { id: 'hba1c', question: 'What is your Hemoglobin A1c (%)?', type: 'input' },
-    { id: 'glucose', question: 'What is your fasting glucose level (mg/dL)?', type: 'input' },
-    { id: 'weight', question: 'What is your body weight (kg)?', type: 'input' },
-    { id: 'height', question: 'What is your height (cm)?', type: 'input' },
-    { id: 'systolic_bp', question: 'What is your systolic blood pressure (mm Hg)?', type: 'input' },
-    { id: 'diastolic_bp', question: 'What is your diastolic blood pressure (mm Hg)?', type: 'input' },
-    { id: 'cholesterol', question: 'What is your cholesterol level (mg/dL)?', type: 'input' },
-    { id: 'ldl', question: 'What is your LDL cholesterol level (mg/dL)?', type: 'input' },
-    { id: 'egfr', question: 'What is your eGFR (estimated kidney function)?', type: 'input' },
+    { id: 'hba1c', question: 'What is your Hemoglobin A1c (%)?', type: 'input', min: 4, max: 15 },
+    { id: 'glucose', question: 'What is your fasting glucose level (mg/dL)?', type: 'input', min: 50, max: 300 },
+    { id: 'weight', question: 'What is your body weight (kg)?', type: 'input', min: 30, max: 200 },
+    { id: 'height', question: 'What is your height (cm)?', type: 'input', min: 100, max: 250 },
+    { id: 'systolic_bp', question: 'What is your systolic blood pressure (mm Hg)?', type: 'input', min: 80, max: 200 },
+    { id: 'diastolic_bp', question: 'What is your diastolic blood pressure (mm Hg)?', type: 'input', min: 40, max: 120 },
+    { id: 'cholesterol', question: 'What is your cholesterol level (mg/dL)?', type: 'input', min: 100, max: 400 },
+    { id: 'ldl', question: 'What is your LDL cholesterol level (mg/dL)?', type: 'input', min: 50, max: 300 },
+    { id: 'egfr', question: 'What is your eGFR (estimated kidney function)?', type: 'input', min: 15, max: 120 },
   ];
 
   const kidneyQuestions: Question[] = [
-    { id: 'age', question: 'What is your age?', type: 'input' },
-    { id: 'egfr', question: 'What is your eGFR (estimated kidney function)?', type: 'input' },
-    { id: 'albumin_creatinine', question: 'What is your albumin-to-creatinine ratio (mg/g)?', type: 'input' },
-    { id: 'glucose', question: 'What is your fasting glucose level (mg/dL)?', type: 'input' },
-    { id: 'hba1c', question: 'What is your Hemoglobin A1c (%)?', type: 'input' },
-    { id: 'bmi', question: 'What is your Body Mass Index (BMI)?', type: 'input' },
-    { id: 'systolic_bp', question: 'What is your systolic blood pressure (mm Hg)?', type: 'input' },
-    { id: 'diastolic_bp', question: 'What is your diastolic blood pressure (mm Hg)?', type: 'input' },
-    { id: 'encounter_count', question: 'How many medical encounters (e.g., hospital visits) have you had?', type: 'input' },
+    { id: 'egfr', question: 'What is your eGFR (estimated kidney function)?', type: 'input', min: 15, max: 120 },
+    { id: 'albumin_creatinine', question: 'What is your albumin-to-creatinine ratio (mg/g)?', type: 'input', min: 0, max: 3000 },
+    { id: 'glucose', question: 'What is your fasting glucose level (mg/dL)?', type: 'input', min: 50, max: 300 },
+    { id: 'hba1c', question: 'What is your Hemoglobin A1c (%)?', type: 'input', min: 4, max: 15 },
+    { id: 'bmi', question: 'What is your Body Mass Index (BMI)?', type: 'input', min: 15, max: 50 },
+    { id: 'systolic_bp', question: 'What is your systolic blood pressure (mm Hg)?', type: 'input', min: 80, max: 200 },
+    { id: 'diastolic_bp', question: 'What is your diastolic blood pressure (mm Hg)?', type: 'input', min: 40, max: 120 },
+    { id: 'encounter_count', question: 'How many medical encounters (e.g., hospital visits) have you had?', type: 'input', min: 0, max: 100 },
   ];
 
-  const questions = disease === 'kidneyDisease' ? kidneyQuestions : diabetesQuestions;
-  const currentQuestion = questions[currentQuestionIndex];
+  const questions = disease === 'kidneyDisease' ? kidneyQuestions : diabetesВопросы;
+  const currentQuestion = currentStep === 1 ? questions[currentQuestionIndex] : null;
 
   const calculateBMI = (weight: number, height: number): number => {
     const heightMeters = height / 100;
@@ -109,7 +124,7 @@ const AssessmentPage = () => {
 
   const validatePayload = (payload: DiabetesPayload | CKDPayload): boolean => {
     return Object.entries(payload).every(([key, value]) => {
-      if (value <= 0) {
+      if (value <= 0 && key !== 'encounter_count') {
         toast.error(`Please provide a valid positive value for ${key}`);
         return false;
       }
@@ -133,43 +148,164 @@ const AssessmentPage = () => {
     return items.filter(item => !item.toLowerCase().includes('consult a healthcare professional')).slice(0, 7);
   };
 
+  const DemographicsForm = () => {
+    const handleDemographicsComplete = () => {
+      if (!age || isNaN(Number(age)) || Number(age) < 18 || Number(age) > 100) {
+        toast.error("Please enter a valid age between 18 and 100");
+        return;
+      }
+      if (!gender) {
+        toast.error("Please select your gender");
+        return;
+      }
+      if (!zipCode || zipCode.length < 5 || zipCode.length > 10) {
+        toast.error("Please enter a valid zipcode/postal code");
+        return;
+      }
+      if (!urbanRural) {
+        toast.error("Please select your area type");
+        return;
+      }
+      setAnswers(prev => ({
+        ...prev,
+        age,
+        gender,
+        zipCode,
+        urbanRural
+      }));
+      setCurrentStep(1);
+    };
+
+    return (
+      <BlurCard className="max-w-3xl mx-auto">
+        <h2 className="text-xl font-semibold mb-6">Demographic Information</h2>
+        <p className="text-gray-600 mb-6">Please provide some basic information to help us with your assessment.</p>
+        <div className="space-y-6">
+          <div>
+            <Label htmlFor="age">Age (18-100)</Label>
+            <Input
+              id="age"
+              type="number"
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              placeholder="Enter your age"
+              min={18}
+              max={100}
+              className="mt-1"
+            />
+          </div>
+          <div>
+            <Label htmlFor="gender">Gender</Label>
+            <RadioGroup
+              value={gender}
+              onValueChange={setGender}
+              className="mt-2 flex flex-col space-y-1"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="male" id="gender-male" />
+                <Label htmlFor="gender-male">Male</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="female" id="gender-female" />
+                <Label htmlFor="gender-female">Female</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="other" id="gender-other" />
+                <Label htmlFor="gender-other">Other</Label>
+              </div>
+            </RadioGroup>
+          </div>
+          <div>
+            <Label htmlFor="zipcode">Zipcode/Postal Code</Label>
+            <Input
+              id="zipcode"
+              type="text"
+              value={zipCode}
+              onChange={(e) => setZipCode(e.target.value)}
+              placeholder="Enter your zipcode/postal code"
+              className="mt-1"
+              maxLength={10}
+            />
+          </div>
+          <div>
+            <Label htmlFor="area-type">Area Type</Label>
+            <Select value={urbanRural} onValueChange={setUrbanRural}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select your area type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="urban">Urban</SelectItem>
+                <SelectItem value="suburban">Suburban</SelectItem>
+                <SelectItem value="rural">Rural</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="pt-4">
+            <Button onClick={handleDemographicsComplete} className="w-full">
+              Continue to Health Assessment
+              <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </BlurCard>
+    );
+  };
+
+  useEffect(() => {
+    if (currentStep === 1 && currentQuestion && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [currentQuestionIndex, currentStep]);
+
   const handleAnswer = async (questionId: string, value: string) => {
-    setAnswers(prev => ({ ...prev, [questionId]: value }));
+    if (currentQuestion) {
+      const numValue = parseFloat(value);
+      if (isNaN(numValue) || numValue < (currentQuestion.min || 0) || numValue > (currentQuestion.max || Infinity)) {
+        toast.error(`Please enter a valid number between ${currentQuestion.min || 0} and ${currentQuestion.max || 'any value'}`);
+        return;
+      }
+      setAnswers(prev => ({ ...prev, [questionId]: value }));
+    }
 
     setTimeout(async () => {
       if (currentQuestionIndex < questions.length - 1) {
         setCurrentQuestionIndex(currentQuestionIndex + 1);
       } else {
+        const finalAnswers = { ...answers, [questionId]: value };
         let payload: DiabetesPayload | CKDPayload;
+        let endpoint: string;
+
         if (disease === 'kidneyDisease') {
           payload = {
-            age: parseFloat(answers.age) || 0,
-            egfr: parseFloat(answers.egfr) || 0,
-            albumin_creatinine: parseFloat(answers.albumin_creatinine) || 0,
-            glucose: parseFloat(answers.glucose) || 0,
-            hba1c: parseFloat(answers.hba1c) || 0,
-            bmi: parseFloat(answers.bmi) || 0,
-            systolic_bp: parseFloat(answers.systolic_bp) || 0,
-            diastolic_bp: parseFloat(answers.diastolic_bp) || 0,
-            encounter_count: parseFloat(answers.encounter_count) || 0
+            age: parseFloat(finalAnswers.age) || 0,
+            egfr: parseFloat(finalAnswers.egfr) || 0,
+            albumin_creatinine: parseFloat(finalAnswers.albumin_creatinine) || 0,
+            glucose: parseFloat(finalAnswers.glucose) || 0,
+            hba1c: parseFloat(finalAnswers.hba1c) || 0,
+            bmi: parseFloat(finalAnswers.bmi) || 0,
+            systolic_bp: parseFloat(finalAnswers.systolic_bp) || 0,
+            diastolic_bp: parseFloat(finalAnswers.diastolic_bp) || 0,
+            encounter_count: parseFloat(finalAnswers.encounter_count) || 0
           };
+          endpoint = '/predict_kidney';
         } else {
-          const weight = parseFloat(answers.weight) || 0;
-          const height = parseFloat(answers.height) || 0;
+          const weight = parseFloat(finalAnswers.weight) || 0;
+          const height = parseFloat(finalAnswers.height) || 0;
           const bmi = height > 0 ? calculateBMI(weight, height) : 0;
           payload = {
-            hba1c: parseFloat(answers.hba1c) || 0,
-            glucose: parseFloat(answers.glucose) || 0,
+            hba1c: parseFloat(finalAnswers.hba1c) || 0,
+            glucose: parseFloat(finalAnswers.glucose) || 0,
             bmi,
             weight,
             height,
-            systolic_bp: parseFloat(answers.systolic_bp) || 0,
-            diastolic_bp: parseFloat(answers.diastolic_bp) || 0,
-            cholesterol: parseFloat(answers.cholesterol) || 0,
-            ldl: parseFloat(answers.ldl) || 0,
-            egfr: parseFloat(answers.egfr) || 0,
-            age: parseFloat(answers.age) || 0
+            systolic_bp: parseFloat(finalAnswers.systolic_bp) || 0,
+            diastolic_bp: parseFloat(finalAnswers.diastolic_bp) || 0,
+            cholesterol: parseFloat(finalAnswers.cholesterol) || 0,
+            ldl: parseFloat(finalAnswers.ldl) || 0,
+            egfr: parseFloat(finalAnswers.egfr) || 0,
+            age: parseFloat(finalAnswers.age) || 0
           };
+          endpoint = '/predict_diabetes';
         }
 
         if (Object.values(payload).some(val => isNaN(val))) {
@@ -182,7 +318,6 @@ const AssessmentPage = () => {
         }
 
         console.log("Sending data:", JSON.stringify(payload));
-        const endpoint = disease === 'kidneyDisease' ? '/predict_kidney' : '/predict_diabetes';
 
         try {
           const predictResponse = await fetch(`http://localhost:8000${endpoint}`, {
@@ -217,6 +352,30 @@ const AssessmentPage = () => {
           const parsedRecommendations = parseRecommendations(recData.recommendations[0] || '');
           setRecommendations(parsedRecommendations.length > 0 ? parsedRecommendations : ['No specific recommendations available.']);
           setIsCompleted(true);
+
+          if (user) {
+            try {
+              const region = zipCode ? `${zipCode} (${urbanRural || 'Unknown Area Type'})` : "Unknown Location";
+              const riskLevel = riskScore < 33 ? 'low' : riskScore < 66 ? 'moderate' : 'high';
+              addAssessment({
+                userId: user.id,
+                type: disease as 'diabetes' | 'kidneyDisease',
+                date: new Date().toISOString(),
+                answers: finalAnswers,
+                riskScore: riskScore,
+                riskLevel: riskLevel,
+                region: region,
+                age: Number(age),
+                gender: gender as 'male' | 'female' | 'other',
+                zipCode,
+                urbanRural: urbanRural as 'urban' | 'suburban' | 'rural'
+              });
+              console.log("Assessment saved successfully");
+            } catch (error) {
+              console.error("Error saving assessment:", error);
+            }
+          }
+
           toast.success("Assessment completed!");
         } catch (err: any) {
           console.error("API error:", err.message);
@@ -228,15 +387,16 @@ const AssessmentPage = () => {
   };
 
   const handleFindHospitals = () => {
-    if (!pincode || pincode.length !== 6 || !/^\d+$/.test(pincode)) {
-      toast.error("Please enter a valid 6-digit pincode");
+    const searchPincode = pincode || zipCode;
+    if (!searchPincode || searchPincode.length < 5 || !/^\d+$/.test(searchPincode)) {
+      toast.error("Please enter a valid zipcode/postal code");
       return;
     }
 
     const mockHospitals: Hospital[] = [
-      { id: '1', name: 'City General Hospital', address: `123 Health Ave, ${pincode}`, distance: '1.2 km', specialties: ['Cardiology', 'Endocrinology', 'General Medicine'] },
-      { id: '2', name: 'Community Medical Center', address: `456 Wellness Blvd, ${pincode}`, distance: '2.5 km', specialties: ['Nephrology', 'Diabetes Care', 'Internal Medicine'] },
-      { id: '3', name: 'Excellence Healthcare', address: `789 Care Street, ${pincode}`, distance: '3.8 km', specialties: ['Cardiology', 'Nephrology', 'Preventive Care'] }
+      { id: '1', name: 'City General Hospital', address: `123 Health Ave, ${searchPincode}`, distance: '1.2 km', specialties: ['Cardiology', 'Endocrinology', 'General Medicine'] },
+      { id: '2', name: 'Community Medical Center', address: `456 Wellness Blvd, ${searchPincode}`, distance: '2.5 km', specialties: ['Nephrology', 'Diabetes Care', 'Internal Medicine'] },
+      { id: '3', name: 'Excellence Healthcare', address: `789 Care Street, ${searchPincode}`, distance: '3.8 km', specialties: ['Cardiology', 'Nephrology', 'Preventive Care'] }
     ];
 
     setHospitals(mockHospitals);
@@ -251,6 +411,58 @@ const AssessmentPage = () => {
   };
 
   const riskInfo = getRiskLevel(riskScore);
+
+  const renderHealthMetrics = () => {
+    if (!currentQuestion) return null;
+    return (
+      <div className="mb-8">
+        <div className="w-full bg-gray-200 h-2 rounded-full mb-6">
+          <div 
+            className="bg-blue-500 h-2 rounded-full transition-all duration-500"
+            style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
+          ></div>
+        </div>
+        <BlurCard className="max-w-3xl mx-auto mb-8">
+          <h2 className="text-xl font-semibold mb-6">
+            Question {currentQuestionIndex + 1} of {questions.length}
+          </h2>
+          <p className="text-lg mb-8">{currentQuestion.question}</p>
+          <div className="space-y-4">
+            <Input
+              type="number"
+              step="any"
+              min={currentQuestion.min}
+              max={currentQuestion.max}
+              placeholder="Enter a value"
+              value={answers[currentQuestion.id] || ''}
+              onChange={(e) => setAnswers(prev => ({ ...prev, [currentQuestion.id]: e.target.value }))}
+              ref={inputRef}
+            />
+          </div>
+          <div className="mt-8 flex justify-between">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (currentQuestionIndex > 0) {
+                  setCurrentQuestionIndex(currentQuestionIndex - 1);
+                } else {
+                  setCurrentStep(0);
+                }
+              }}
+            >
+              Previous
+            </Button>
+            <Button 
+              onClick={() => handleAnswer(currentQuestion.id, answers[currentQuestion.id] || '')}
+            >
+              {currentQuestionIndex === questions.length - 1 ? 'Complete' : 'Next'}
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </BlurCard>
+      </div>
+    );
+  };
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
@@ -267,65 +479,10 @@ const AssessmentPage = () => {
           </div>
         )}
       </div>
-      
       {!isCompleted ? (
-        <div className="mb-8">
-          <div className="w-full bg-gray-200 h-2 rounded-full mb-6">
-            <div 
-              className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-              style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
-            ></div>
-          </div>
-          
-          <BlurCard className="max-w-3xl mx-auto mb-8">
-            <h2 className="text-xl font-semibold mb-6">
-              Question {currentQuestionIndex + 1} of {questions.length}
-            </h2>
-            <p className="text-lg mb-8">{currentQuestion.question}</p>
-            
-            <div className="space-y-4">
-              <Input
-                type="number"
-                step="any"
-                min="0"
-                placeholder="Enter a value"
-                value={answers[currentQuestion.id] || ''}
-                onChange={(e) => setAnswers(prev => ({ ...prev, [currentQuestion.id]: e.target.value }))}
-              />
-            </div>
-            
-            <div className="mt-8 flex justify-between">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (currentQuestionIndex > 0) {
-                    setCurrentQuestionIndex(currentQuestionIndex - 1);
-                  }
-                }}
-                disabled={currentQuestionIndex === 0}
-              >
-                Previous
-              </Button>
-              
-              <Button 
-                onClick={() => {
-                  if (!answers[currentQuestion.id] || parseFloat(answers[currentQuestion.id]) <= 0) {
-                    toast.error("Please enter a valid positive number");
-                    return;
-                  }
-                  if (currentQuestionIndex < questions.length - 1) {
-                    setCurrentQuestionIndex(currentQuestionIndex + 1);
-                  } else {
-                    handleAnswer(currentQuestion.id, answers[currentQuestion.id]);
-                  }
-                }}
-              >
-                {currentQuestionIndex === questions.length - 1 ? 'Complete' : 'Next'}
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </div>
-          </BlurCard>
-        </div>
+        <>
+          {currentStep === 0 ? <DemographicsForm /> : renderHealthMetrics()}
+        </>
       ) : (
         <div className="max-w-3xl mx-auto">
           <BlurCard className="text-center p-8">
@@ -334,7 +491,6 @@ const AssessmentPage = () => {
               <h2 className="text-2xl font-bold mb-2">Assessment Complete</h2>
               <p className="text-gray-600">Based on your answers, we've analyzed your risk factors.</p>
             </div>
-            
             <div className="mb-8">
               <div className="relative h-36 w-36 mx-auto">
                 <div className="absolute inset-0 rounded-full border-8 border-gray-100"></div>
@@ -348,7 +504,6 @@ const AssessmentPage = () => {
                 </div>
               </div>
             </div>
-            
             <div className="bg-gray-50 p-6 rounded-lg mb-6 text-left">
               <h3 className="font-semibold mb-3">What this means:</h3>
               <p className="text-gray-700 mb-4">
@@ -356,7 +511,6 @@ const AssessmentPage = () => {
                 {riskInfo.level === 'moderate' && 'You have some risk factors that should be monitored. Consider lifestyle adjustments.'}
                 {riskInfo.level === 'high' && 'You have significant risk factors. We recommend consulting with a healthcare professional.'}
               </p>
-              
               <h3 className="font-semibold mb-3">Health Recommendations:</h3>
               <ul className="text-gray-700 space-y-2 mb-4">
                 {recommendations.length > 0 ? (
@@ -373,7 +527,6 @@ const AssessmentPage = () => {
               <p className="text-gray-600 text-sm italic">
                 Disclaimer: These recommendations are general and educational. Always consult a healthcare professional for personalized advice.
               </p>
-              
               <h3 className="font-semibold mb-3 mt-6">Next steps:</h3>
               <ul className="text-gray-700 space-y-2">
                 <li className="flex items-start gap-2">
@@ -390,7 +543,6 @@ const AssessmentPage = () => {
                 </li>
               </ul>
             </div>
-            
             <div className="bg-blue-50 p-6 rounded-lg mb-6">
               <h3 className="font-semibold mb-4 flex items-center">
                 <MapPin className="h-5 w-5 mr-2 text-blue-500" />
@@ -399,10 +551,10 @@ const AssessmentPage = () => {
               <div className="flex gap-3">
                 <Input 
                   type="text" 
-                  placeholder="Enter your pincode" 
+                  placeholder="Enter your zipcode" 
                   value={pincode}
                   onChange={(e) => setPincode(e.target.value)}
-                  maxLength={6}
+                  maxLength={10}
                   className="bg-white"
                 />
                 <Button 
@@ -412,7 +564,6 @@ const AssessmentPage = () => {
                   Find Hospitals
                 </Button>
               </div>
-              
               {showHospitals && (
                 <div className="mt-4">
                   <h4 className="font-medium mb-3">Nearby Hospitals & Clinics:</h4>
@@ -445,7 +596,6 @@ const AssessmentPage = () => {
                 </div>
               )}
             </div>
-            
             <div className="mt-8 flex gap-4 justify-center">
               <Button
                 variant="outline" 

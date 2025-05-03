@@ -1,44 +1,27 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BlurCard } from "@/components/ui-custom/BlurCard";
-import { login } from "@/lib/utils";
-import { AlertCircle, Heart, UserCog } from "lucide-react";
-
-// List of common personal email domains to be blocked
-const PERSONAL_EMAIL_DOMAINS = [
-  'gmail.com',
-  'yahoo.com',
-  'hotmail.com',
-  'outlook.com',
-  'aol.com',
-  'icloud.com',
-  'protonmail.com',
-  'mail.com',
-  'zoho.com',
-  'yandex.com',
-  'gmx.com',
-  'live.com',
-  'msn.com'
-];
+import { AlertCircle, Shield } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from '@/contexts/AuthContext';
 
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const isBusinessEmail = (email: string): boolean => {
-    const domain = email.split('@')[1]?.toLowerCase();
-    if (!domain) return false;
-    
-    // Check if the domain is in the list of personal email domains
-    return !PERSONAL_EMAIL_DOMAINS.includes(domain);
-  };
+  useEffect(() => {
+    if (user && localStorage.getItem('adminUser')) {
+      navigate('/admin/dashboard');
+    }
+  }, [user, navigate]);
   
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,48 +32,56 @@ const AdminLogin = () => {
       return;
     }
     
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      setError('Please enter a valid email address');
-      return;
-    }
-    
-    // Validate business email
-    if (!isBusinessEmail(email)) {
-      setError('Administrator access requires a business email domain');
-      return;
-    }
-    
     setIsLoading(true);
     
     try {
-      // In a real app, this would validate with a backend
-      // For this demo, we're simulating login with a utility function
-      const success = login(email, password);
+      // Simplified login validation
+      const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      const isValidPassword = password.length >= 6;
       
-      if (success) {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        // Redirect admin users to admin dashboard
-        navigate('/admin/dashboard');
-      } else {
-        setError('Invalid administrator credentials');
+      if (!isValidEmail || !isValidPassword) {
+        setError('Invalid email or password');
+        setIsLoading(false);
+        return;
       }
+
+      // Store mock admin session in localStorage for persistence
+      const adminUser = { 
+        email, 
+        role: 'admin',
+        id: 'admin-123'
+      };
+      
+      localStorage.setItem('adminUser', JSON.stringify(adminUser));
+      
+      // Remove any patient user to avoid conflicts
+      localStorage.removeItem('user');
+      
+      // Simulate successful login
+      toast.success('Logged in as administrator');
+      
+      // Use a timeout to ensure the state is updated before redirecting
+      setTimeout(() => {
+        navigate('/admin/dashboard');
+      }, 100);
     } catch (err) {
-      setError('An error occurred during login. Please try again.');
       console.error('Login error:', err);
+      setError('An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }
   };
   
+  if (user && localStorage.getItem('adminUser')) {
+    return null;
+  }
+  
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-health-50/50 to-white">
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-gray-50 to-white">
       <div className="absolute top-6 left-6">
         <Link to="/" className="flex items-center gap-2 text-lg font-medium">
-          <Heart className="h-5 w-5 text-health-600" />
-          <span>HealthRisk</span>
+          <Shield className="h-5 w-5 text-primary" />
+          <span>Admin Portal</span>
         </Link>
       </div>
       
@@ -98,21 +89,19 @@ const AdminLogin = () => {
         <div className="flex flex-col space-y-6 p-6">
           <div className="flex flex-col space-y-2 text-center">
             <div className="flex justify-center mb-2">
-              <div className="p-2 bg-health-100 rounded-full">
-                <UserCog className="h-8 w-8 text-health-600" />
+              <div className="p-2 bg-primary/10 rounded-full">
+                <Shield className="h-8 w-8 text-primary" />
               </div>
             </div>
             <h1 className="text-2xl font-semibold tracking-tight">Administrator Login</h1>
             <p className="text-sm text-muted-foreground">
-              Sign in to access the administrator dashboard
+              Sign in to access the admin dashboard
             </p>
-            <p className="text-xs text-amber-600 mt-1">
-              Only business email domains are accepted for administrator access
-            </p>
+            {/* Demo credentials removed */}
           </div>
           
           {error && (
-            <div className="bg-red-50 text-red-800 p-3 rounded-md flex items-center text-sm">
+            <div className="bg-destructive/10 text-destructive p-3 rounded-md flex items-center text-sm">
               <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
               {error}
             </div>
@@ -120,54 +109,41 @@ const AdminLogin = () => {
           
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Admin Email</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@company.com"
+                placeholder="admin@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="transition-all duration-200 focus-visible:ring-health-500"
               />
             </div>
             
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <Link to="#" className="text-xs text-health-600 hover:text-health-800 transition-colors">
-                  Forgot password?
-                </Link>
-              </div>
+              <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="transition-all duration-200 focus-visible:ring-health-500"
               />
             </div>
             
             <Button
               type="submit"
-              className="w-full health-gradient shadow-sm hover:shadow-md transition-shadow"
+              className="w-full"
               disabled={isLoading}
             >
               {isLoading ? 'Signing in...' : 'Sign In as Administrator'}
             </Button>
           </form>
           
-          <div className="mt-4 text-center text-sm">
-            Need an administrator account?{" "}
-            <Link to="/admin/signup" className="text-health-600 hover:text-health-800 transition-colors">
-              Sign up here
+          <div className="text-center text-sm">
+            <Link to="/login" className="text-primary hover:text-primary/90 transition-colors">
+              Return to Patient Login
             </Link>
-          </div>
-          
-          <div className="text-center text-xs text-muted-foreground">
-            For administrator access, please contact your system administrator.
           </div>
         </div>
       </BlurCard>

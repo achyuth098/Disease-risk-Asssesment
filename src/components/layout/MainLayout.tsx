@@ -1,10 +1,11 @@
 
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, Home, User, BarChart, LogOut } from "lucide-react";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
+import { useAuth } from '@/contexts/AuthContext';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -20,7 +21,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({
   fullWidth = false 
 }) => {
   const location = useLocation();
+  const { signOut } = useAuth();
   const isAuthenticated = location.pathname !== '/' && location.pathname !== '/login' && location.pathname !== '/signup';
+  
+  const handleLogout = (e: React.MouseEvent) => {
+    e.preventDefault();
+    signOut();
+  };
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -103,12 +110,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({
                 </span>
               </Link>
               
-              <Link to="/login" className="flex flex-col items-center p-2">
+              <button onClick={handleLogout} className="flex flex-col items-center p-2">
                 <LogOut size={20} className="text-muted-foreground" />
                 <span className="text-xs mt-1 text-muted-foreground">
                   Logout
                 </span>
-              </Link>
+              </button>
             </div>
           </div>
         </nav>
