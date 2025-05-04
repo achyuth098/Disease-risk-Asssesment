@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Heart, AlertCircle, Droplet, Activity, CheckCircle, ChevronRight, FileText, MapPin, Building } from "lucide-react";
+import { Heart, AlertCircle, Droplet, Activity, CheckCircle, ChevronRight, FileText, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import { getDiseaseInfo } from '@/lib/utils';
 import { BlurCard } from '@/components/ui-custom/BlurCard';
@@ -203,7 +203,6 @@ const AssessmentPage = () => {
   const [pincode, setPincode] = useState('');
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
   const [showHospitals, setShowHospitals] = useState(false);
-  const [recommendations, setRecommendations] = useState<string[]>([]);
   const [age, setAge] = useState<string>('');
   const [gender, setGender] = useState<string>('');
   const [zipCode, setZipCode] = useState<string>('');
@@ -260,22 +259,6 @@ const AssessmentPage = () => {
       }
       return true;
     });
-  };
-
-  const parseRecommendations = (text: string): string[] => {
-    const lines = text.split('\n').filter(line => line.trim());
-    const items = [];
-    let currentItem = '';
-    for (const line of lines) {
-      if (/^\d+\./.test(line)) {
-        if (currentItem) items.push(currentItem.trim());
-        currentItem = line;
-      } else {
-        currentItem += ' ' + line;
-      }
-    }
-    if (currentItem) items.push(currentItem.trim());
-    return items.filter(item => !item.toLowerCase().includes('consult a healthcare professional')).slice(0, 7);
   };
 
   useEffect(() => {
@@ -368,23 +351,6 @@ const AssessmentPage = () => {
           const predictData = await predictResponse.json();
           console.log("Prediction response:", JSON.stringify(predictData));
           setRiskScore(Math.round(predictData.risk_percentage));
-
-          const recommendationPayload = { disease, risk_score: predictData.risk_percentage, ...payload };
-          const recommendationResponse = await fetch("http://localhost:8000/recommendations", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(recommendationPayload)
-          });
-
-          if (!recommendationResponse.ok) {
-            const errorText = await recommendationResponse.text();
-            throw new Error(`Recommendations failed: ${recommendationResponse.status} - ${errorText}`);
-          }
-
-          const recData = await recommendationResponse.json();
-          console.log("Raw recommendations:", recData.recommendations);
-          const parsedRecommendations = parseRecommendations(recData.recommendations[0] || '');
-          setRecommendations(parsedRecommendations.length > 0 ? parsedRecommendations : ['No specific recommendations available.']);
           setIsCompleted(true);
 
           if (user) {
@@ -560,23 +526,7 @@ const AssessmentPage = () => {
                 {riskInfo.level === 'moderate' && 'You have some risk factors that should be monitored. Consider lifestyle adjustments.'}
                 {riskInfo.level === 'high' && 'You have significant risk factors. We recommend consulting with a healthcare professional.'}
               </p>
-              <h3 className="font-semibold mb-3">Health Recommendations:</h3>
-              <ul className="text-gray-700 space-y-2 mb-4">
-                {recommendations.length > 0 ? (
-                  recommendations.map((rec, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                      <span>{rec}</span>
-                    </li>
-                  ))
-                ) : (
-                  <li className="text-gray-500">No recommendations available.</li>
-                )}
-              </ul>
-              <p className="text-gray-600 text-sm italic">
-                Disclaimer: These recommendations are general and educational. Always consult a healthcare professional for personalized advice.
-              </p>
-              <h3 className="font-semibold mb-3 mt-6">Next steps:</h3>
+              <h3 className="font-semibold mb-3">Next steps:</h3>
               <ul className="text-gray-700 space-y-2">
                 <li className="flex items-start gap-2">
                   <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
@@ -584,7 +534,7 @@ const AssessmentPage = () => {
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                  <span>Make lifestyle adjustments based on recommendations</span>
+                  <span>Consider lifestyle adjustments based on your risk level</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
