@@ -1,39 +1,226 @@
-# Health risk 0 meter
+# Disease Risk Assessment
 
-## Project info
+A web application for assessing diabetes and kidney disease risk using machine learning models, built with a FastAPI backend and a React frontend. The application allows users to input demographic and health data to receive a risk percentage score.
 
-Health Risk O Meter is a React-based web application that helps users assess their risk levels for various health conditions such as Diabetes, Heart Disease, Lung Cancer, and Kidney Disease. The app provides a questionnaire-based risk analysis and calculates a score based on the user's respo
+---
 
+## Table of Contents
 
-Features
-Interactive health assessment questionnaire
-Disease-specific risk calculation
-Dynamic progress tracking
-Instant result with risk level analysis
-Printable health risk reports
-User-friendly and mobile-responsive design
+- [Prerequisites](#prerequisites)  
+- [Setup Instructions](#setup-instructions)  
+  - [1. Clone the Repository](#1-clone-the-repository)  
+  - [2. Set Up the Backend (FastAPI)](#2-set-up-the-backend-fastapi)  
+  - [3. Set Up the Frontend (React)](#3-set-up-the-frontend-react)  
+- [Running the Application](#running-the-application)  
+- [Testing the Application](#testing-the-application)  
+- [Project Structure](#project-structure)  
+- [Troubleshooting](#troubleshooting)  
+- [License](#license)  
 
-**Clone the Repository**
+---
 
-```sh
-git clone https://github.com/achyuth098/health-risk-o-meter.git
+## Prerequisites
+
+Before setting up the application, ensure the following are installed on your Windows system:
+
+- **Anaconda or Miniconda**: For managing Python environments. [Download](https://www.anaconda.com/)  
+- **Node.js (version 18 or higher)**: For running the React frontend. [Download](https://nodejs.org/)  
+- **Git**: For cloning the repository. [Download](https://git-scm.com/)  
+- **VS Code (optional)**: For editing and managing the project. [Download](https://code.visualstudio.com/)  
+
+---
+
+## Setup Instructions
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/achyuth098/Disease-risk-Asssesment.git  
+cd Disease-risk-Asssesment  
 ```
 
-**Install Dependencies**
+### 2. Set Up the Backend (FastAPI)
 
-```sh
-npm install
-npm run dev
+The backend uses FastAPI to serve prediction endpoints (`/predict_diabetes`, `/predict_kidney`) with pre-trained machine learning models.
+
+#### Step 2.1: Create and Activate Conda Environment
+
+```bash
+conda create -n diabetes-api python=3.8  
+conda activate diabetes-api  
 ```
 
-**How It Works?**
+#### Step 2.2: Install Backend Dependencies
 
-Select the health condition you want to assess.
+```bash
+pip install fastapi uvicorn joblib numpy pydantic scikit-learn==1.6.1  
+```
 
-Answer a series of health-related questions.
+#### Step 2.3: Verify Model Files
 
-The system calculates a risk score based on your answers.
+Ensure the pre-trained model files are present in `Backend/models/`:
 
-Get an instant analysis of your risk level (Low, Moderate, or High).
+- `diabetes_model.pkl`  
+- `kidney_model.pkl`  
 
-Download or print your assessment report for future reference.
+If missing, contact the project maintainer or retrain the models using scikit-learn 1.6.1.
+
+---
+
+### 3. Set Up the Frontend (React)
+
+The frontend is a React application built with Vite, displaying the risk assessment interface.
+
+#### Step 3.1: Navigate to Frontend Directory
+
+```bash
+cd rar  
+```
+
+#### Step 3.2: Install Frontend Dependencies
+
+```bash
+npm install  
+```
+
+If you encounter a "running scripts is disabled" error:
+
+```bash
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned  
+```
+
+Then retry `npm install`.
+
+#### Step 3.3: Verify Frontend Files
+
+Ensure the following files are present and up-to-date:
+
+- `rar/src/pages/AssessmentPage.tsx`  
+- `rar/package.json` (includes `vite@6.3.4` and other dependencies)  
+
+---
+
+## Running the Application
+
+### Step 1: Start the FastAPI Backend
+
+```bash
+conda activate diabetes-api  
+cd C:\Users\SRand\Downloads\Disease-risk-Asssesment-main\Disease-risk-Asssesment-main  
+uvicorn Backend.app:app --host 127.0.0.1 --port 8000  
+```
+
+Keep this terminal running.
+
+### Step 2: Start the React Frontend
+
+Open a new terminal:
+
+```bash
+cd rar  
+npm run dev  
+```
+
+Visit: [http://localhost:8080](http://localhost:8080)
+
+---
+
+## Testing the Application
+
+### Open the Application
+
+Visit: [http://localhost:8080/assessment/diabetes](http://localhost:8080/assessment/diabetes)
+
+### Perform a Diabetes Risk Assessment
+
+- **Demographics**:  
+  - Age: `50`  
+  - Gender: `male`  
+  - Zip Code: `12345`  
+  - Urban/Rural: `urban`  
+- **Health Metrics**:  
+  - hba1c: `5.5`  
+  - glucose: `100`  
+  - weight: `70`  
+  - height: `170`  
+  - systolic_bp: `120`  
+  - diastolic_bp: `80`  
+  - cholesterol: `200`  
+  - ldl: `130`  
+  - egfr: `60`  
+
+Click **Complete** and verify:
+
+- A risk score is displayed (e.g., `51%`)  
+- No 404 errors  
+- Browser console logs:
+  - `Sending data`  
+  - `Prediction response`  
+  - `Assessment saved successfully` (if Supabase is configured)  
+
+### Check Backend Logs
+
+Ensure the Uvicorn terminal shows no errors.
+
+---
+
+## Project Structure
+
+```
+Disease-risk-Asssesment/
+├── Backend/
+│   ├── app.py                   # FastAPI backend with prediction endpoints
+│   └── models/
+│       ├── diabetes_model.pkl   # Pre-trained diabetes model
+│       └── kidney_model.pkl     # Pre-trained kidney disease model
+├── rar/
+│   ├── src/
+│   │   └── pages/
+│   │       └── AssessmentPage.tsx  # React component for risk assessment UI
+│   ├── package.json             # Frontend dependencies
+│   └── vite.config.ts           # Vite configuration
+└── README.md                    # Project documentation
+```
+
+---
+
+## Troubleshooting
+
+### 404 Error for Recommendations
+
+- Ensure `rar/src/pages/AssessmentPage.tsx` does not fetch `/recommendations`  
+- Verify `Backend/app.py` does not include `/recommendations` endpoint  
+
+### Model Loading Errors
+
+- Confirm `diabetes_model.pkl` and `kidney_model.pkl` are in `Backend/models/`  
+- Ensure `scikit-learn==1.6.1` is installed:
+
+```bash
+pip show scikit-learn  
+```
+
+### Frontend Dependency Issues
+
+- Run:
+
+```bash
+npm audit fix  
+```
+
+- Verify `vite@6.3.4` in `package.json`  
+
+### Backend Startup Errors
+
+- Check Uvicorn logs  
+- Ensure the Conda environment is activated:
+
+```bash
+conda activate diabetes-api  
+```
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the `LICENSE` file for details.
