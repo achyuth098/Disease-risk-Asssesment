@@ -4,23 +4,20 @@ A web application for assessing diabetes and kidney disease risk using machine l
 
 ---
 
-## Project Structure
+## Table of Contents
 
-```
-Disease-risk-Asssesment/
-├── Backend/
-│   ├── app.py                   # FastAPI backend with prediction endpoints
-│   └── models/
-│       ├── diabetes_model.pkl   # Pre-trained diabetes model
-│       └── kidney_model.pkl     # Pre-trained kidney disease model
-├── 
-│   ├── src/
-│   │   └── pages/
-│   │       └── AssessmentPage.tsx  # React component for risk assessment UI
-│   ├── package.json             # Frontend dependencies
-│   └── vite.config.ts           # Vite configuration
-└── README.md                    # Project documentation
-```
+- [Prerequisites](#prerequisites)  
+- [Setup Instructions](#setup-instructions)  
+  - [1. Clone the Repository](#1-clone-the-repository)  
+  - [2. Set Up the Backend (FastAPI)](#2-set-up-the-backend-fastapi)  
+  - [3. Set Up the Frontend (React)](#3-set-up-the-frontend-react)  
+- [Running the Application](#running-the-application)  
+- [Testing the Application](#testing-the-application)  
+- [Project Structure](#project-structure)  
+- [Troubleshooting](#troubleshooting)  
+- [License](#license)  
+
+---
 
 ---
 
