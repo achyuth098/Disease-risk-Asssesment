@@ -4,18 +4,23 @@ A web application for assessing diabetes and kidney disease risk using machine l
 
 ---
 
-## Table of Contents
+## Project Structure
 
-- [Prerequisites](#prerequisites)  
-- [Setup Instructions](#setup-instructions)  
-  - [1. Clone the Repository](#1-clone-the-repository)  
-  - [2. Set Up the Backend (FastAPI)](#2-set-up-the-backend-fastapi)  
-  - [3. Set Up the Frontend (React)](#3-set-up-the-frontend-react)  
-- [Running the Application](#running-the-application)  
-- [Testing the Application](#testing-the-application)  
-- [Project Structure](#project-structure)  
-- [Troubleshooting](#troubleshooting)  
-- [License](#license)  
+```
+Disease-risk-Asssesment/
+├── Backend/
+│   ├── app.py                   # FastAPI backend with prediction endpoints
+│   └── models/
+│       ├── diabetes_model.pkl   # Pre-trained diabetes model
+│       └── kidney_model.pkl     # Pre-trained kidney disease model
+├── 
+│   ├── src/
+│   │   └── pages/
+│   │       └── AssessmentPage.tsx  # React component for risk assessment UI
+│   ├── package.json             # Frontend dependencies
+│   └── vite.config.ts           # Vite configuration
+└── README.md                    # Project documentation
+```
 
 ---
 
@@ -74,7 +79,7 @@ The frontend is a React application built with Vite, displaying the risk assessm
 #### Step 3.1: Navigate to Frontend Directory
 
 ```bash
-cd rar  
+cd directory_name  
 ```
 
 #### Step 3.2: Install Frontend Dependencies
@@ -95,8 +100,8 @@ Then retry `npm install`.
 
 Ensure the following files are present and up-to-date:
 
-- `rar/src/pages/AssessmentPage.tsx`  
-- `rar/package.json` (includes `vite@6.3.4` and other dependencies)  
+- `your_directory/src/pages/AssessmentPage.tsx`  
+- `your_directory/package.json` (includes `vite@6.3.4` and other dependencies)  
 
 ---
 
@@ -106,7 +111,7 @@ Ensure the following files are present and up-to-date:
 
 ```bash
 conda activate diabetes-api  
-cd C:\Users\SRand\Downloads\Disease-risk-Asssesment-main\Disease-risk-Asssesment-main  
+cd C:your_directory\Disease-risk-Asssesment-main  
 uvicorn Backend.app:app --host 127.0.0.1 --port 8000  
 ```
 
@@ -117,7 +122,7 @@ Keep this terminal running.
 Open a new terminal:
 
 ```bash
-cd rar  
+cd your_directory  
 npm run dev  
 ```
 
@@ -173,7 +178,7 @@ Disease-risk-Asssesment/
 │   └── models/
 │       ├── diabetes_model.pkl   # Pre-trained diabetes model
 │       └── kidney_model.pkl     # Pre-trained kidney disease model
-├── rar/
+├── Frontend/
 │   ├── src/
 │   │   └── pages/
 │   │       └── AssessmentPage.tsx  # React component for risk assessment UI
@@ -188,7 +193,7 @@ Disease-risk-Asssesment/
 
 ### 404 Error for Recommendations
 
-- Ensure `rar/src/pages/AssessmentPage.tsx` does not fetch `/recommendations`  
+- Ensure `src/pages/AssessmentPage.tsx` does not fetch `/recommendations`  
 - Verify `Backend/app.py` does not include `/recommendations` endpoint  
 
 ### Model Loading Errors
